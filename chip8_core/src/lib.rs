@@ -404,7 +404,7 @@ impl Emu {
             // SET Delay timer to a value from VX, ie. DT = VX
             (0xF, _, 1, 5) => {
                 let x = digit2 as usize;
-                self.dt = self.vz_reg[x];
+                self.dt = self.v_reg[x];
             }
 
             //FX18
@@ -412,7 +412,7 @@ impl Emu {
             // same as above, but on sound timer
             (0xF, _, 1, 8) => {
                 let x = digit2 as usize;
-                self.st = self.vz_reg[x];
+                self.st = self.v_reg[x];
             }
 
             //FX1E
@@ -439,11 +439,13 @@ impl Emu {
             //TODO: find more fast and efficient BCD algorithms so I dont have to do floating point arithmetics
             (0xF, _, 3, 3) => {
                 let x = digit2 as usize;
+                let vx = self.v_reg[x] as f32;
+
                 let hundreds = (vx / 100.0).floor() as u8;
                 let tens = ((vx / 10.0) % 10.0).floor() as u8;
                 let ones = (vx % 10.0) as u8;
 
-                self.ram[self.i_reg as usize] = hundereds;
+                self.ram[self.i_reg as usize] = hundreds;
                 self.ram[(self.i_reg + 1) as usize] = tens;
                 self.ram[(self.i_reg + 2) as usize] = ones;
             }
