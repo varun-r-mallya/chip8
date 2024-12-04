@@ -493,4 +493,25 @@ impl Emu {
             self.st -= 1;
         }
     }
+
+    //returns a pointer to screen buffer array
+    pub fn get_display(&self) -> &[bool] {
+        &self.screen
+    }
+
+    //key buffer array frontend API manipulator
+    //TODO: In the future, I could handle the limit of 16 here and panic directly instead of handling this in the frontend
+    pub fn keypress(&mut self, idx: usize, pressed: bool) {
+        self.keys[idx] = pressed;
+    }
+
+    //loads game code from file to RAM so it can be executed
+    //TAKE A LIST OF BYTES AND WRITE TO RAM
+    pub fn load(&mut self, data: &[u8]) {
+        let start = START_ADDR as usize;
+        let end = (START_ADDR as usize) + data.len();
+        self.ram[start..end].copy_from_slice(data);
+    }
+
+    //TODO: completed to section 6.2 
 }
