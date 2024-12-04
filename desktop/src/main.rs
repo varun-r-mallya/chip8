@@ -9,6 +9,9 @@ use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 
+const TICKS_PER_FRAME: usize = 10; //EXPERIMENTAL TICK RATE
+const TIMER_TICK_PER_NUMER_OF_FRAMES: usize = 2; //EXPERIMENTAL TIMER TICK RATE
+
 const SCALE: u32 = 15;
 const WINDOW_WIDTH: u32 = (SCREEN_WIDTH as u32) * SCALE;
 const WINDOW_HEIGHT: u32 = (SCREEN_HEIGHT as u32) * SCALE;
@@ -63,7 +66,9 @@ fn main() {
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
 
+    let mut frame_count = 0;
     'gameloop: loop {
+        frame_count += 1;
         for evt in event_pump.poll_iter() {
             match evt {
                 Event::Quit { .. } => {
@@ -72,7 +77,14 @@ fn main() {
                 _ => (),
             }
         }
+
+        for _ in 0..TICKS_PER_FRAME {
+            chip8.tick();
+        }
+        chip8.tick_timers();
+        if frame_count % TIMER_TICK_PER_NUMER_OF_FRAMES == 0 {
+            chip8.tick_timers();
+        }
         draw_screen(&chip8, &mut canvas);
-        chip8.tick();
     }
 }
