@@ -1,3 +1,5 @@
+use rand::random;
+
 const RAM_SIZE: usize = 4096;
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
@@ -249,7 +251,116 @@ impl Emu {
                 self.v_reg[0xF] = lsb;
             }
 
-            //TODO: continue from page 24, section 5.2.16
+            //8XY7
+            //VX = VY - VX
+            // VF CARRY FLAG STORES THE BORROWED VALUE
+            (8, _, _, 7) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+
+                let (new_vx, borrow) = self.v_reg[y].overflowing_sub(self.v_reg[x]);
+                let new_vf = if borrow { 0 } else { 1 };
+
+                self.v_reg[x] = new_vx;
+                self.v_reg[0xF] = new_vf;
+            }
+
+            //8XYE
+            // VX <<= 1
+            // OVERFLOW STORED IN VF
+            (8, _, _, _) => {
+                let x = digit2 as usize;
+                let msb = (self.v_reg[x] >> 7) & 1;
+                self.v_reg[x] <<= 1;
+                self.v_reg[0xF] = msb;
+            }
+
+            //9XY0
+            //SKIP ON VX != VY
+            (9, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                if self.v_reg[x] != self.v_reg[y] {
+                    self.pc += 2;
+                }
+            }
+
+            //ANNN
+            //(address pointer to RAM) I register initisialised I = NNN
+            (0xA, _, _, _) => {
+                let nnn = op & 0xFFF;
+                self.i_reg = nnn;
+            }
+
+            //BNNN
+            //JMP TO V0 + NNN
+            (0xB, _, _, _) => {
+                let nnn = (op & 0xFFF) as u16;
+                self.sp = (self.v_reg[0] as u16) + nnn;
+            }
+
+            //CXNN
+            //Chip-8's RNG
+            // VX = rand() & NN
+            (0xC, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                let rng: u8 = random();
+                self.v_reg[x] = rng & nn;
+            }
+
+            //DRAW SPRITES
+            //DXYN
+            //X AND Y ARE COORDINATES INTO V_REG AND N IS THE NUMBER OF ROWS. NUMBER OF COLUMNS PER ROW IS ALWAYS 8
+            (0xD, _, _, _) => {
+                //gets x and y coords
+                let x_coord = self.v_reg[digit2 as usize] as u16;
+                let y_coord = self.v_reg[digit3 as usize] as u16;
+                //number of rows
+                let num_rows = digit4;
+                //checks if pixels were flipped
+                let mut flipped = false;
+                //iterate over each row of sprite
+                for y_line in 0..num_rows {
+                    // row data stored at I register
+                    let addr = self.i_reg + y_line as u16;
+                    let pixels = self.ram[addr as usize];
+                    //Iterate over each column in the row
+                    for x_line in 0..8 {
+                        // Sprites to wrap around screen
+                        // Use a mask to fetch current pixel's bit. Only flip if a 1
+                        if (pixels & (0b1000_0000 >> x_line)) != 0 {
+                            let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
+                            let y = (y_coord + y_line) as usize % SCREEN_HEIGHT;
+                            //get pixel index for 1d screen array
+                            let idx = x + SCREEN_WIDTH * y;
+                            // check for flipping
+                            flipped |= self.screen[idx];
+                            self.screen[idx] ^= true;
+                        }
+                    }
+                }
+                //if flipped, put in VF register
+                if flipped {
+                    self.v_reg[0xF] = 1;
+                } else {
+                    self.v_reg[0xF] = 0;
+                }
+            }
+
+            //KEY PRESS SKIP
+            //EX9E
+            //if index stored in VX is pressed, then we have a SKIP
+            (0xE, _, 9, 0xE) => {
+                let x = digit2 as usize;
+                let vx = self.v_reg[x];
+                let key = self.keys[vx as usize];
+                if key {
+                    self.pc += 2;
+                }
+            }
+
+            //TODO: CONTINUE FROM SECTION 5.2.24
 
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
