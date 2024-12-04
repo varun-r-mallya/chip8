@@ -360,7 +360,115 @@ impl Emu {
                 }
             }
 
-            //TODO: CONTINUE FROM SECTION 5.2.24
+            //KEY NOT PRESS SKIP
+            //EXA1
+            //if index stored in VX is not pressed, then we have a SKIP
+            (0xE, _, 0xA, 1) => {
+                let x = digit2 as usize;
+                let vx = self.v_reg[x];
+                let key = self.keys[vx as usize];
+                if !key {
+                    self.pc += 2;
+                }
+            }
+
+            //FX07
+            //VX = DT
+            // stores delay timer value into VX
+            (0xF, _, 0, 7) => {
+                let x = digit2 as usize;
+                self.v_reg[x] = self.dt;
+            }
+
+            //FX0A
+            //Waits for key press and loop endlessly until our condition of the key press becomes true
+            //TODO: TRY IMPROVING THIS TO BE ASYNCHRONOUS INSTEAD OF LOOPING
+            (0xF, _, 0, 0xA) => {
+                let x = digit2 as usize;
+                //TODO: LEARN ABOUT MUTABILITY HERE AND FIND OUT WHY IT IS NECESSARY
+                let mut pressed = false;
+                for i in 0..self.keys.len() {
+                    if self.keys[i] {
+                        self.v_reg[x] = i as u8;
+                        pressed = true;
+                        break;
+                    }
+                }
+                if !pressed {
+                    //REDO OPCODE
+                    self.pc -= 2;
+                }
+            }
+
+            //FX15
+            // SET Delay timer to a value from VX, ie. DT = VX
+            (0xF, _, 1, 5) => {
+                let x = digit2 as usize;
+                self.dt = self.vz_reg[x];
+            }
+
+            //FX18
+            // SET Sound timer to a value from VX, ie. DT = VX
+            // same as above, but on sound timer
+            (0xF, _, 1, 8) => {
+                let x = digit2 as usize;
+                self.st = self.vz_reg[x];
+            }
+
+            //FX1E
+            // I += VX
+            // increment the I-register values
+            (0xF, _, 1, 0xE) => {
+                let x = digit2 as usize;
+                let vx = self.v_reg[x] as u16;
+                self.i_reg = self.i_reg.wrapping_add(vx);
+            }
+
+            //explanation of the next opcode
+            //ram address of font is just 5 times the value of the thing to be printed.
+            //FX29
+            //font at I
+            (0xF, _, 2, 9) => {
+                let x = digit2 as usize;
+                let c = self.v_reg[x] as u16;
+                self.i_reg = c * 5;
+            }
+
+            //FX33
+            //CONVERTS TO BINARY CODED DECIMAL FORMAT OF THE NUMBER STORED IN VX
+            //TODO: find more fast and efficient BCD algorithms so I dont have to do floating point arithmetics
+            (0xF, _, 3, 3) => {
+                let x = digit2 as usize;
+                let hundreds = (vx / 100.0).floor() as u8;
+                let tens = ((vx / 10.0) % 10.0).floor() as u8;
+                let ones = (vx % 10.0) as u8;
+
+                self.ram[self.i_reg as usize] = hundereds;
+                self.ram[(self.i_reg + 1) as usize] = tens;
+                self.ram[(self.i_reg + 2) as usize] = ones;
+            }
+
+            //FX55
+            //first of the two isntructions that populates registers V0 to VX to RAM
+            //STORE V0 to VX to RAM
+            (0xF, _, 5, 5) => {
+                let x = digit2 as usize;
+                let i = self.i_reg as usize;
+                for idx in 0..=x {
+                    self.ram[i + idx] = self.v_reg[idx];
+                }
+            }
+
+            //FX65
+            //first of the two instructions that populates registers V0 to VX from RAM
+            //LOAD V0 to VX from RAM
+            (0xF, _, 6, 5) => {
+                let x = digit2 as usize;
+                let i = self.i_reg as usize;
+                for idx in 0..=x {
+                    self.v_reg[idx] = self.ram[i + idx];
+                }
+            }
 
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
