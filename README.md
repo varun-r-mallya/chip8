@@ -1,5 +1,5 @@
 # Chip 8 Emulator written in Rust
-Uses SDL2 and is Work in Progress
+Uses SDL2 and will probably be made with a webassembly build and hosted in the future.
 ### Roms at
 - https://www.zophar.net/pdroms/chip8/chip-8-games-pack.html
 ### References
