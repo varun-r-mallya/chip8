@@ -99,8 +99,158 @@ impl Emu {
         let digit2 = (op & 0x0F00) >> 8;
         let digit3 = (op & 0x00F0) >> 4;
         let digit4 = op & 0x000F;
-        //TODO: continue from page 19
+
         match (digit1, digit2, digit3, digit4) {
+            //NOP
+            //(Do nothing)
+            (0, 0, 0, 0) => return,
+
+            //CLS
+            //(clears the screen)
+            (0, 0, 0xE, 0) => {
+                self.screen = [false; SCREEN_HEIGHT * SCREEN_WIDTH];
+            }
+
+            //RET
+            //(returns from a subroutine)
+            (0, 0, 0xE, 0xE) => {
+                let return_address = self.pop();
+                self.pc = return_address;
+            }
+
+            //JMP NNN
+            //(jump to the given address)
+            (1, _, _, _) => {
+                let nnn = op & 0xFFF;
+                self.pc = nnn;
+            }
+
+            //CALL NNN
+            //(calling a function)
+            (2, _, _, _) => {
+                let nnn = op & 0xFFF;
+                self.push(self.pc);
+                self.pc = nnn;
+            }
+
+            //3XNN
+            //SKIP NEXT IF VX == NN
+            (3, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                if self.v_reg[x] == nn {
+                    self.pc += 2;
+                }
+            }
+
+            //4XNN
+            //SKIP NEXT IF VX != NN
+            (4, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                if self.v_reg[x] != nn {
+                    self.pc += 2;
+                }
+            }
+
+            //5XY0
+            //SKIP NEXT IF VX = VY
+            (5, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                if self.v_reg[x] == self.v_reg[y] {
+                    self.pc += 2;
+                }
+            }
+
+            //6XNN
+            //SET V[X] TO NN
+            (6, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                self.v_reg[x] = nn;
+            }
+
+            //7XNN
+            // VX += NN
+            (7, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0xFF) as u8;
+                self.v_reg[x] += nn;
+            }
+
+            //8XY0
+            // VX = VY
+            (8, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] = self.v_reg[y];
+            }
+
+            //8XY1
+            //VX |= VY
+            (8, _, _, 1) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] |= self.v_reg[y];
+            }
+
+            //8XY2
+            //VX &= VY
+            (8, _, _, 2) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] &= self.v_reg[y];
+            }
+
+            //8XY3
+            //VX ^= VY
+            (8, _, _, 3) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] ^= self.v_reg[y];
+            }
+
+            //8XY4
+            //VX += VY
+            //VF CARRY FLAG IS USED WHEN CARRYING
+            (8, _, _, 4) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+
+                let (new_vx, carry) = self.v_reg[x].overflowing_add(self.v_reg[y]);
+                let new_vf = if carry { 1 } else { 0 };
+
+                self.v_reg[x] = new_vx;
+                self.v_reg[0xF] = new_vf;
+            }
+
+            //8XY5
+            //VX -= VY
+            //UNSET VF CARRY FLAG ON BORROW
+            (8, _, _, 5) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+
+                let (new_vx, borrow) = self.v_reg[x].overflowing_sub(self.v_reg[y]);
+                let new_vf = if borrow { 0 } else { 1 };
+
+                self.v_reg[x] = new_vx;
+                self.v_reg[0xF] = new_vf;
+            }
+
+            //8XY6
+            //VX >>= VY
+            // VF CARRY FLAG STORES THE DROPPED OFF VALUE
+            (8, _, _, 6) => {
+                let x = digit2 as usize;
+                let lsb = self.v_reg[x] & 1;
+                self.v_reg[x] >>= 1;
+                self.v_reg[0xF] = lsb;
+            }
+
+            //TODO: continue from page 24, section 5.2.16
+
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
